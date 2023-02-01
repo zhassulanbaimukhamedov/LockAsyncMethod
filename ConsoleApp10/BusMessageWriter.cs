@@ -8,30 +8,33 @@ namespace ConsoleApp10
 {
     public class BusMessageWriter
     {
-        readonly IBusConnection _connection = new();
-        readonly MemoryStream _buffer = new();
-        private static readonly SemaphoreLocker _locker = new SemaphoreLocker();
+        private static readonly SemaphoreLocker _locker = new();
+
+        public MemoryStream Buffer { get; } = new();
+
+        internal IBusConnection? Connection { get; }
 
         public async Task SendMessageAsync(byte[] nextMessage)
         {
             //var result = await _locker.LockAsync(async () =>
             await _locker.LockAsync(async () =>
             {
-                _buffer.Write(nextMessage, 0, nextMessage.Length);
-                if (_buffer.Length > 1000)
+                Buffer.Write(nextMessage, 0, nextMessage.Length);
+                if (Buffer.Length > 1000)
                 {
-                    await _connection.PublishAsync(_buffer.ToArray());
-                    _buffer.SetLength(0);
+                    await Connection.PublishAsync(Buffer.ToArray());
+                    Buffer.SetLength(0);
                 }
             });
         }
     }
-    interface IConnection
+
+    internal interface IConnection
     {
         Task PublishAsync(byte[] a);
     }
 
-    class IBusConnection : IConnection
+    internal class IBusConnection : IConnection
     {
         public Task PublishAsync(byte[] a)
         {
@@ -39,9 +42,9 @@ namespace ConsoleApp10
         }
     }
 
-    public class SemaphoreLocker
+    public class SemaphoreLocker : IDisposable
     {
-        private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim _semaphore = new(1, 1);
 
         public async Task LockAsync(Func<Task> worker)
         {
@@ -68,6 +71,11 @@ namespace ConsoleApp10
             {
                 _semaphore.Release();
             }
+        }
+
+        public void Dispose()
+        {
+            throw new NotImplementedException();
         }
     }
 
